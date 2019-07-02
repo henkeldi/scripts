@@ -1,0 +1,49 @@
+#!/usr/bin/python2.7
+# -*- coding: utf-8 -*-
+import argparse
+import os
+import sys
+import subprocess
+
+
+def find_libs(path):
+    libs = []
+    for root, dir, files in os.walk(path):
+        for file in files:
+            if file.endswith('.so') or file.endswith('.a'):
+                root = root[2:] if root.startswith('./') else root
+                libs.append({'root': root, 'file': file})
+    return libs
+
+
+def main(path, symbol):
+    libs = find_libs(path)
+    out_lib_paths = set()
+    out_libs = set()
+    for lib in libs:
+        lib_path = os.path.join(lib['root'], lib['file'])
+        cmd = 'nm --defined-only --demangle {} 2> /dev/null | grep {}'\
+            .format(lib_path, symbol)
+        process = subprocess.Popen('/bin/bash',
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE)
+        out, err = process.communicate(cmd)
+        if out:
+            lib_dir = '-L' + lib['root']
+            out_lib_paths.add(lib_dir)
+            lib_name = lib['file'][3:] if lib['file'].startswith('lib')\
+                else lib['file']
+            lib_name = lib_name[:lib_name.rindex('.')]
+            full_lib_name = '-l' + lib_name
+            print
+            print lib_dir
+            print full_lib_name
+            print
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("path", help="The path where to look for libraries")
+    parser.add_argument("symbol", help="Symbol to look for inside the library")
+    args = parser.parse_args()
+    main(args.path, args.symbol)
